@@ -72,8 +72,18 @@ class ESPAccessory {
         this._clearConnection(connection);
         this._messages = [];
         if (this.device != undefined && this.device.isPublished()) {
-            this.device.unpublish();
-            console.log("Unpublish", this._server == undefined);
+            if(this.expire && typeof(this.expire) == "number") {
+                if(this.tmUnpublish) { clearTimeout(this.tmUnpublish); }
+                this.tmUnpublish = setTimeout(function() {
+                    this.tmUnpublish = undefined;
+                    this.device.unpublish();
+                    console.log("Unpublish", this._server == undefined);
+                }, this.expire);
+                console.log("To Unpublish in ", this.expire);
+            } else {
+                this.device.unpublish();
+                console.log("Unpublish", this._server == undefined);
+            }
             // for (var index in this.device.services) {
             //     this.device.services[index].getCharacteristic(Characteristic.Active).updateValue(0);    
             // }
@@ -115,6 +125,7 @@ class ESPAccessory {
         } else if(msg.payload) {
             var payload = msg.payload;
             if("publish" == payload.cmd) {
+                this.expire = payload.expire;
                 if (this.device.isPublished()) {
                     this._connection.sendACK(msg, false, "Already published!");
                     return;
