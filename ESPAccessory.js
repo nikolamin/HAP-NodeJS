@@ -3,12 +3,15 @@ var Service = require('./').Service;
 var Characteristic = require('./').Characteristic;
 var uuid = require('./').uuid;
 
+let removeKey = function(k) { let t = this[k]; delete this[k]; return t; }
+
 String.prototype.capitalize = function() {
 	return this.charAt(0).toUpperCase() + this.slice(1);
 }
 Accessory.prototype.isPublished = function() {
     return this._server != undefined;
 }
+
 function getOrUpdate(storage, key, defVal) {
     var data = storage.getItemSync(key);
     if(!data) {
@@ -142,18 +145,21 @@ class ESPAccessory {
                 }.bind(this));
             } else if("register" == payload.cmd) {
                 let info = payload.service;
-                if(info.service == undefined) { console.error("Undefined service name."); return; }
-                let serviceRef = Service[info.service.capitalize()];
-                if(serviceRef == undefined) { console.error(`Unsupported service '${info.service}'.`); return; }
+                let serviceName = removeKey.bind(info)("service");
+                if(serviceName == undefined) { console.error("Undefined service name."); return; }
+                let serviceRef = Service[serviceName.capitalize()];
+                if(serviceRef == undefined) { console.error(`Unsupported service '${serviceName}'.`); return; }
                 
-                this._addService(serviceRef, info.service, info.id, function(service) {
+                let serviceId = removeKey.bind(info)("id");
+                this._addService(serviceRef, serviceName, serviceId, function(service) {
                     for(var k in info) {
+                        if(!info.hasOwnProperty(k)) continue;
                         let conf = info[k];
                         if(typeof conf != "object") continue;
                         if(Characteristic[k] == undefined) { console.error(`Unsuported characteristic ${k}`); return; }
                         let characteristic = service.getCharacteristic(Characteristic[k], true);
                         if(!conf.eventsOnly) {
-                            characteristic.on('set', this.accessorySetHandler(info.service, info.id, k));                            
+                            characteristic.on('set', this.accessorySetHandler(serviceName, serviceId, k));                            
                         }
                         if(conf.props) {
                             characteristic.setProps(conf.props)
@@ -161,30 +167,31 @@ class ESPAccessory {
                         if(conf.value == undefined) {
                             conf.value = false;
                         }
-                        console.log(`Added '${info.service}.${k} #${info.id}' - ${conf.value}`);
+                        console.log(`Added '${serviceName}.${k} #${serviceId}' - ${conf.value}`, conf);
                     }
                 });
 
                 // this._connection.sendACK(msg);
 
                 for(var k in info) {
+                    if(!info.hasOwnProperty(k)) continue;
                     let conf = info[k];
                     if(typeof conf != "object") continue;
                     if(conf.eventsOnly) {
-                        this.accessoryValue(info.service, info.id, k, conf.value || false);
+                        this.accessoryValue(serviceName, serviceId, k, conf.value || false);
                     } else {
-                        let state = this.accessoryValue(info.service, info.id, k);
+                        let state = this.accessoryValue(serviceName, serviceId, k);
                         if(state == false || state.value == undefined || state.time == 0 || conf.valueTime >= state.time) {
-                            this.accessoryValue(info.service, info.id, k, conf.value || false);
+                            this.accessoryValue(serviceName, serviceId, k, conf.value || false);
                         } else {
                             if(state.value) {
-                                let payload = {cmd: 'set', value: state.value, time: state.time, service: info.service, property: k, id: info.id};
+                                let payload = {cmd: 'set', value: state.value, time: state.time, service: serviceName, property: k, id: serviceId};
                                 setTimeout(function() {
                                     console.log("Update", payload);
                                     this._connection.sendPayload(payload);
                                 }.bind(this),1000);
                             }
-                            this.accessoryValue(info.service, info.id, k, state.value || false);
+                            this.accessoryValue(serviceName, serviceId, k, state.value || false);
                         }
                     }
                 }
