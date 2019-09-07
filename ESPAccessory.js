@@ -168,6 +168,7 @@ class ESPAccessory {
                         if(conf.value == undefined) {
                             conf.value = false;
                         }
+                        console.log(`Added '${serviceName}.${k} #${serviceId}' - ${conf.value}`, conf);
                     }
                 });
 
