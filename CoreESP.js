@@ -48,7 +48,7 @@ wsServer.on('request', function(request) {
     console.log("New Message", message)
     if (message.type === 'utf8') {
       var msg = JSON.parse(message.utf8Data)
-      if(msg == undefined || msg.payload == undefined) { console.err("Wrong message format"); return; }
+      if(msg == undefined || msg.payload == undefined) { console.error("Wrong message format"); return; }
       var payload = msg.payload;
       if("init" == payload.cmd) {
         var device = devices[msg.payload.name];
